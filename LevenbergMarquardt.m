@@ -1,4 +1,25 @@
 function [x, cost,info,options, current_point] = LevenbergMarquardt(problem, x, options)
+%Code based on original implementation: 
+%@article{LMMethid,
+%title = {Riemannian {L}evenberg--{M}arquardt {M}ethod with {G}lobal and {L}ocal {C}onvergence {P}roperties},
+%year = {2022},
+%abstract = {We extend the Levenberg-Marquardt method on Euclidean spaces to Riemannian
+%manifolds. Although a Riemannian Levenberg-Marquardt (RLM) method was produced
+%by Peeters in 1993, to the best of our knowledge, there has been no analysis of
+%theoretical guarantees for global and local convergence properties. As with the
+%Euclidean LM method, how to update a specific parameter known as the damping
+%parameter has significant effects on its performances. We propose a
+%trust-region-like approach for determining the parameter. We evaluate the
+%worst-case iteration complexity to reach an epsilon-stationary point, and also
+%prove that it has desirable local convergence properties under the local
+%error-bound condition. Finally, we demonstrate the efficiency of our proposed
+%algorithm by numerical experiments.},
+%author = {Adachi, Sho and Okuno, Takayuki and Takeda, Akiko},
+%copyright = {http://creativecommons.org/publicdomain/zero/1.0},
+%language = {eng},
+%}
+
+
 localdefaults.verbosity = 2;
 localdefaults.maxtime = inf;
 localdefaults.miniter = 0;
