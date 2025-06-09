@@ -1,4 +1,14 @@
 function x = lm_tCG_solver(Afun, b, M, x0, tol, maxit)
+%Implementation based on Algorithm 6.2 of 
+%@Book{boumal,
+%  title     = {An introduction to optimization on smooth manifolds},
+%  author    = {Boumal, Nicolas},
+%  publisher = {Cambridge University Press},
+%  year      = {2023},
+%  url       = {https://www.nicolasboumal.net/book},
+%  doi       = {10.1017/9781009166164}
+%}
+
     x = M.zerovec(x0);
     r = b-Afun(x);
     p = r;
