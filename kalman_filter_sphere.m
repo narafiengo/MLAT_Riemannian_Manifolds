@@ -1,7 +1,16 @@
-%% Note that in this script, the Euclidean gradient of the distance function
-%% being used, instead of the computed Riemannian gradient given in Expression 
+%%   In this script the iterative refinement procedure is tested on 
+%%   of selected path trajectory on the unit sphere
+%%   The script is structured as follows: 
+%%   In part 1: we define the necessary functions to apply optimization algorithms on the sphere
+%%   In part 2: we generate the exact path in order to generate our measurements
+%%   In part 3: we generate the noisy measurements and apply GN and LM to generate the raw estimates
+%%   In part 4: the iterative refinement scheme gn_kalman_smoother is implemented and applied to refine path estimates
+%%              where 1 is used to indicate where we are working with GN and 0 for LM
+%%   In part 5: the MSE and gain are measured
 
-%noise sphere and path
+
+%% PART 1:    
+
 %Euclidean gradient
 function gradient = gradientSphere(x, p, r, manifold)
 K = length(p);
@@ -16,7 +25,7 @@ end
 gradient = gradient./K;
 end 
 
-
+%Euclidean GN approximation
 function hessian = hessian_GN(x,p,manifold, v)
 K = length(p);
 hessian = 0;
@@ -31,17 +40,17 @@ for i = 1 : K
 end
 end 
 
-
+%Riemannian GN approximation (needed as LM implementation on works with Riemannian version)
 function hessian = hessian_GNRiemannian(x,p,manifold, v)
 K = length(p);
 hessian = 0;
 for i = 1 : K
     pval = p{i};
     dist = manifold.dist(x, pval);
-    %gradientDist = -manifold.log(x, pval)./dist;
     chordalDist = norm(x(:)-pval(:), 'fro');
     A = sqrt(1-(chordalDist/2)^2);
     gradientDist = 1/(A*chordalDist)*(x(:)-pval(:))./(sqrt(K)); 
+    %convert euclidean gradient to riemannian
     gradientDist = manifold.egrad2rgrad(x, gradientDist);
     gradient_prd = manifold.inner(x,gradientDist, v);
     hessian = hessian + gradient_prd*gradientDist;
@@ -85,7 +94,7 @@ end
 Fx = (1/sqrt(K)).*Fx;
 end
 
-%% path generator 
+%% PART 2: 
 n = 3;
 manifold = spherefactory(n);
 N = 500;
@@ -98,27 +107,24 @@ for i = 1: N
 end
 plot3(traj2(1,:),traj2(2,:), traj2(3,:), 'b')
 
-%% the trajectory we used for the results
+% the trajectory we used for the results (which was generated using previous commands)
 traj2 = load('trajectory2.mat').traj2;
-
-%% show trajectory path
-n = 3;
-manifold = spherefactory(n);
-
 traj = load('trajectory.mat').traj;
 plot3(traj2(1,:),traj2(2,:), traj2(3,:), 'b')
 xlim([-1,1])
 ylim([-1,1])
 zlim([-1,1])
 %%
+
 pvalues = cell(1, 3);
 midTrajectory = traj2(:,250);
 startTrajectory = traj(:,15);
 premidTrajectory = traj(:,25);
-% random vectors
+% random vectors to generate anchors
 %v1 = manifold.randvec(midTrajectory);
 %v2 = manifold.randvec(midTrajectory);
 
+%or choose independent vectors
 B = tangent_basis_sphere(midTrajectory);
 v1 = B{1};
 v2 = B{2};
@@ -129,7 +135,8 @@ v3 = manifold.randvec(midTrajectory);
 v3 = v3./manifold.norm(midTrajectory,v3);
 v4 = manifold.randvec(midTrajectory);
 v4 = v4./manifold.norm(midTrajectory,v4);
-%% generate anchors
+%% PART 3:
+% generate anchors
 pvalues{1} = manifold.exp(midTrajectory, 0.5*v1);
 pvalues{2} = manifold.exp(midTrajectory, -1.5*v2);
 pvalues{3} = manifold.exp(midTrajectory, 1.5*v3);
@@ -186,20 +193,22 @@ for i = 2: N+1
     LMtrajectorynoisePure(:,i-1) = solLM;
     x0LMpure = solLM; 
 end
-%% this is important otherwise is uses the last x0 of the gn and LM
+%% PART 4:
+% this is important otherwise it uses the last x0 of the gn and LM
 x0GNpure = x0;
 x0LMpure = x0;
 
-%% GN estimates (1 to indicate GN method used)
+% GN estimates (1 to indicate GN method used)
 B_ran = tangent_basis_sphere(x0GNpure);
 B_ran = [B_ran{1}, B_ran{2}];    
 [x_filtered, P, numberIterGN] = gn_kalman_smoother(measurements, pvalues, manifold, x0GNpure, 1, B_ran);
-%% LM estimates (0 to indicated LM method used)
+
+% LM estimates (0 to indicated LM method used)
 B_ran = tangent_basis_sphere(x0GNpure);
 B_ran = [B_ran{1}, B_ran{2}];
 [x_filteredLM, P, numberIterLM] = gn_kalman_smoother(measurements, pvalues, manifold, x0LMpure, 0, B_ran);
 
-%% Compute error
+%% PART 5:
 
 for i = 1:500
     errorValNoise(i) = manifold.dist(traj2(:,i),GNtrajectorynoisePure(:,i));
@@ -213,7 +222,7 @@ gain = MSENoise/MSEFilt;
 %%
 function [x_filtered, P, numberIter] = gn_kalman_smoother(measurements, anchors, manifold, x0, gnLM,B_ran)
     %measurements= rvalues for N = 100: N x K matrix (K anchors, N time steps)
-    %anchors: K x 3 cell array of anchor positions
+    %anchors: Kx3 cell array of anchor positions
     
     N = size(measurements,1);
     x_filtered = zeros(3,N);
@@ -247,15 +256,16 @@ function [x_filtered, P, numberIter] = gn_kalman_smoother(measurements, anchors,
         
         numberIter(k-1) = length([info.iter]);
         
+        %random walk to generate estimate
         xi = randn(2,1);
         velocityk = B_ran*xi;
         xprior = manifold.exp(x_filtered(:,k-1),0.01.*velocityk);
-        [R_gn, B] = compute_gn_covariance(xprior, anchors, measurements(k-1,:), manifold);
-        
+        [R_gn, B] = compute_gn_covariance(xprior, anchors, manifold);
         Q = 0.01^2 * eye(2);
-        
         P(:,:,k-1) = P(:,:,k-1)+ Q;
+        %update step
         [x_filtered(:,k), P(:,:,k)] = update_step(xprior, P(:,:,k-1), x_gn, R_gn, manifold, B);
+        %compute basis at the new filtered estimate (needed to compute vector for random walk)
         B_ran = tangent_basis_sphere(x_filtered(:,k));
         B_ran = [B_ran{1}, B_ran{2}];
     end
@@ -288,7 +298,7 @@ function [x_new, P_new] = update_step(x, P, z, R, manifold, B)
     P_new = (I-K*H)*P*(I-K*H)' + K*R*K';
 end
 
-function [R_gn, B] = compute_gn_covariance(x, anchors, measurements, manifold)
+function [R_gn, B] = compute_gn_covariance(x, anchors, manifold)
     J = zeros(length(anchors),2);
     B = tangent_basis_sphere(x);
     
