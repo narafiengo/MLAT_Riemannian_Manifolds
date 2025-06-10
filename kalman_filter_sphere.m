@@ -1,4 +1,4 @@
-%% Note that in this script, the Euclidean gradient of the distance function 
+%% Note that in this script, the Euclidean gradient of the distance function
 %% being used, instead of the computed Riemannian gradient given in Expression 
 
 %noise sphere and path
